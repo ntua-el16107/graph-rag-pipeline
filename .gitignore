@@ -1,6 +1,18 @@
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
 .venv/
 .env
-.vscode/
+
+# OS
+.DS_Store
+
+# Data
 data/
 faiss_index/
+
+# VSCode
+.vscode/

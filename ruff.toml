@@ -1,2 +1,2 @@
 line-length = 100
-extend-select = ['I','UP','B','SIM','PL']
+extend-select = ["I","UP","B","SIM","PL"]
