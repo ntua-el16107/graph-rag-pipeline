@@ -1,0 +1,256 @@
+{
+  "ontology_prompt_version": "2",
+  "ontology_schema": "ontology_schema_v11.json",
+  "execution_mode": "validation",
+  "language": "en",
+  "prompt_generated_at": "{{now}}",
+  "execution_context": {
+    "today_date": "{{today_date}}",
+    "temporal_reference_policy": "all temporal modeling must be relative to today_date",
+    "status_transition_modeling_required": true,
+    "language_handling": "Input article in Greek (el) must be processed with multilingual labels. Greek labels (label_el) sourced from standard translations or ontology mappings (e.g., 'Ρωσία' for Russia), with fallback to generic type (e.g., 'Χώρα') if unavailable. Output in English (en)."
+  },
+  "semantic_fit_policy": {
+    "enforce_semantic_fit": true,
+    "require_reasoning_for_each_entity": true,
+    "prohibit_forced_canonical_mapping": true,
+    "log_forced_mapping_as_violation": true,
+    "required_fields": [
+      "entity_id",
+      "class_used",
+      "semantic_fit_justification",
+      "forced_mapping_flag",
+      "proposed_alternative_class"
+    ],
+    "violation_resolution": "If a canonical class is used but is not a semantic fit, model the entity as an unmapped_entity with a class proposal and log the violation in validation_log and reasoning_log."
+  },
+  "bilingual_label_policy": {
+    "required_languages": ["en", "el"],
+    "predicate_uri": "http://www.w3.org/2000/01/rdf-schema#label",
+    "validation_mode": "hard",
+    "fallback_mode": "log_and_continue"
+  },
+  "input_article": {
+    "source_url": "{{source_url}}",
+    "article_text": "{{article_text}}",
+    "language": "{{language}}",
+    "required": true
+  },
+  "theme_policy": {
+    "generic_themes": [
+      "Energy Infrastructure",
+      "Energy Policy",
+      "Renewable Energy"
+    ],
+    "dynamic_theme_extraction": {
+      "enabled": true,
+      "method": "keyword_extraction",
+      "confidence_threshold": 0.7,
+      "max_themes": 5,
+      "map_to_ontology": true,
+      "queue_unmapped_themes": true,
+      "role": "Guide entity and relationship extraction, not replace other blocks"
+    },
+    "prioritization": {
+      "primary": "dynamic_themes",
+      "fallback": "generic_themes",
+      "include_in_response": ["dynamic_themes", "generic_themes"],
+      "validation_log_mapping_enabled": true,
+      "validation_log_required_fields": [
+        "theme",
+        "source",
+        "ontology_mapping",
+        "confidence_score"
+      ]
+    }
+  },
+  "response_format": "json_only",
+  "violation_on_auxiliary_display": true,
+  "execution_contract": {
+    "output_format_version": "v1.4.8",
+    "enforce_flat_fields": false,
+    "strict_uri_typing": true,
+    "field_uri_required": true,
+    "forbid_display_tools": true,
+    "guard_clause": "DO NOT use display_dataframe_to_user or any render. JSON format only.",
+    "module_execution_policy": {
+      "execution_order": [
+        "OntologyAutoLoader",
+        "ssdis_aggregator.py",
+        "TemporalCommitEngine",
+        "EventCascadePlanner",
+        "PatchManager",
+        "ThemeExtractor"
+      ],
+      "reconciliation_log_fields": [
+       "location",
+       "original_value",
+       "canonical_value",
+       "match_reason",
+       "confidence_score"
+     ],
+      "fallback_strategies": {
+        "OntologyAutoLoader": "Log failure in reasoning_log and proceed with partial entity mapping",
+        "TemporalCommitEngine": "Log failure and use static timestamps",
+        "EventCascadePlanner": "Log failure and skip scenario events",
+        "ThemeExtractor": "Use generic themes only and log fallback in reasoning_log",
+        "PatchManager": "Log failure and return null patch_suggestions"
+      }
+    },
+    "step_execution_order": [
+      "STEP_0: SEMANTIC_FIT_GUARD",
+      "STEP_1: ONTOLOGY_SCHEMA_ENFORCEMENT",
+      "STEP_2: FIELD-First PROPERTY MATCHING",
+      "STEP_3: RELATIONSHIP INFERENCE",
+      "STEP_4: TEMPORAL AND STATUS ANCHORING",
+      "STEP_5: CONTRACT MODELING",
+      "STEP_6: VERSIONING AND SCENARIO",
+      "STEP_7: VALIDATION & PATCH",
+      "STEP_8: THEME EXTRACTION"
+    ],
+    "required_output_blocks": [
+      { "block": "entities", "priority": "high", "fallback": "Log missing entities in reasoning_log" },
+      { "block": "unmapped_entities", "priority": "high", "fallback": "All salient non-canonical entities in the article MUST be included with proposed classes/fields/justification." },
+      { "block": "temporal_events", "priority": "high", "fallback": "Log missing events in reasoning_log" },
+      { "block": "status_transitions", "priority": "high", "fallback": "Log missing transitions in reasoning_log" },
+      { "block": "contract_relations", "priority": "medium", "fallback": "Return empty array if no relations identified" },
+      { "block": "scenario_events", "priority": "medium", "fallback": "Return empty array if no future events identified" },
+      { "block": "coreference_clusters", "priority": "medium", "fallback": "Return empty array if no aliases detected" },
+      { "block": "patch_suggestions", "priority": "medium", "fallback": "Return null patch if no violations" },
+      { "block": "ontology_completion_queue", "priority": "medium", "fallback": "Return empty array if no unmapped classes" },
+      { "block": "themes", "priority": "low", "fallback": "Return generic themes only" },
+      { "block": "validation_log", "priority": "high", "fallback": "Log minimal validation status" },
+      { "block": "reasoning_log", "priority": "high", "fallback": "Log minimal processing notes" },
+      { "block": "provenance", "priority": "high", "fallback": "Log missing provenance in reasoning_log and return null provenance" }
+    ],
+    "fallback_on_error": {
+      "strategy": "partial_success_and_log",
+      "error_template": {
+        "error": "ontology_schema_incomplete",
+        "missing_sections": []
+      }
+    },
+    "contract_class": "https://energyontology.org/ontology/Energy#Contract",
+    "contract_class_note": "Use Energy#Contract for contractual relationships. For non-standard cases (e.g., subsidies, regulatory restrictions), use Energy#Policy or auxiliary_fields.",
+    "contract_modeling_examples": [
+      {
+        "concept": "subsidy program",
+        "mapping": "Energy#Policy",
+        "auxiliary_fields": ["subsidy_amount", "eligibility_issues"],
+        "example": "Model 'Κινούμαι Ηλεκτρικά 3' as Energy#Policy with auxiliary fields for issues."
+      },
+      {
+        "concept": "ferry boarding restriction",
+        "mapping": "SocioEconomic_Ontology#Policy",
+        "auxiliary_fields": ["restriction_details", "enforcement"],
+        "example": "Model ferry battery limit as a policy with enforcement details."
+      }
+    ]
+  },
+  "reasoning_log_trigger_on": [
+    "output_format_deviation",
+    "field_uri_missing",
+    "relationship_mismatch",
+    "enum_violation",
+    "canary_flag_flipped",
+    "temporal_event_missing",
+    "use_of_abstract_class",
+    "undefined_predicate_detected",
+    "theme_extraction_failure",
+    "module_execution_failure",
+    "provenance_missing",
+    "semantic_fit_violation",
+    "forced_canonical_mapping"
+  ],
+  "canary": {
+    "id": "test__CanaryEntity_PromptIntegrity",
+    "type": "https://test.energyontology.org/Canary#TestEntity",
+    "field_uri": "https://test.energyontology.org/Canary#json_output_only_violation",
+    "test_flag": false,
+    "log_status_required": true,
+    "additional_test_flag": "provenance_block_missing",
+    "additional_field_uri": "https://test.energyontology.org/Canary#provenance_block_violation"
+  },
+  "field_schema_check": {
+    "enabled": true,
+    "enforce_per_class": true,
+    "reject_if_field_not_in_class_definition": true,
+    "log_rejection_in_validation_log": true,
+    "validation_log_format": {
+      "required_fields": [
+        "violation",
+        "entity_id",
+        "field",
+        "description",
+        "resolution"
+      ]
+    }
+  },
+  "field_uri_validation": {
+    "require_full_uri": true,
+    "forbid_fragment_strings": true
+  },
+  "status_enum_inference": {
+    "allow_surface_variants": false,
+    "map_variants_to_enums": true,
+    "required_if_status_does_not_match": "EntityStatusTransition"
+  },
+  "patch_suggestion_policy": {
+    "require_patch_suggestions_if_violations": true,
+    "require_patch_if_shacl_triggered": true,
+    "require_null_patch_if_nothing_to_fix": true,
+    "explanation_fields": [
+      "predicate_inferred_from_text",
+      "alternative_candidates",
+      "justification_snippet"
+    ]
+  },
+  "diagnostics_policy": {
+    "block_violation_strategy": "partial_success_and_log",
+    "enforce_presence_of": [
+      "reasoning_log",
+      "validation_log",
+      "provenance"
+    ]
+  },
+  "coreference_policy": {
+    "strict_alias": false,
+    "related": true
+  },
+  "abstract_class_policy": "log_in_reasoning_log_and_provenance_proposal_in_ontology_completion_queue",
+  "future_temporal_policy": {
+    "allow_speculative_iso8601": true,
+    "require_confidence_score": true,
+    "link_to_scenario": true
+  },
+  "prompt_blocks": {
+    "STEP_0": {
+      "name": "SEMANTIC_FIT_GUARD",
+      "description": "Before assigning any canonical ontology class to an entity, ensure the class *semantically fits* the entity's real-world function and the article's description. If not, reject the mapping and propose a new class in unmapped_entities."
+    },
+    "STEP_1": {
+      "name": "ONTOLOGY_SCHEMA_ENFORCEMENT"
+    },
+    "STEP_2": {
+      "name": "FIELD-First PROPERTY MATCHING"
+    },
+    "STEP_3": {
+      "name": "RELATIONSHIP INFERENCE"
+    },
+    "STEP_4": {
+      "name": "TEMPORAL AND STATUS ANCHORING"
+    },
+    "STEP_5": {
+      "name": "CONTRACT MODELING"
+    },
+    "STEP_6": {
+      "name": "VERSIONING AND SCENARIO"
+    },
+    "STEP_7": {
+      "name": "VALIDATION & PATCH"
+    },
+    "STEP_8": {
+      "name": "THEME EXTRACTION"
+    }
+  }
+}
